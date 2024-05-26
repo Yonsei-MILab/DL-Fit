@@ -11,23 +11,61 @@ import matplotlib.pyplot as plt
 import torch
 from skimage.metrics import normalized_root_mse as nrmse, structural_similarity as ssim, peak_signal_noise_ratio as psnr
 from util import configure
-from Implementation_sigmoid import laplacian_fn, mag_weight_fn, neural_weight_fn, build_net, train_net, Uncertainty_mask
+import math
+from torch import nn
+from 2_Util_Phase_Only_Joint import laplacian_fn, mag_weight_fn, neural_weight_fn, build_net, train_net, Uncertainty_mask
 
 # Configure GPU
 configure(gpu_id=0)
 device = torch.device("cuda")
 
-# Load training dataset
-data = loadmat("training_dataset.mat", simplify_cells=True)
-gts, masks, imgs = [data[k] for k in ["dataset_label", "dataset_mask", "dataset_training"]]
+# Testing Network
+def prod(iterable):
+    result = 1
+    for x in iterable:
+        result *= x
+    return result
 
-# Convert to torch tensors and move to device
-gts, masks, imgs = (
-    torch.tensor(gts, dtype=torch.float),
-    torch.tensor(masks, dtype=bool),
-    torch.tensor(imgs, dtype=torch.complex64),
-)
-gts, masks, imgs = [x.to(device) for x in [gts, masks, imgs]]
+def build_net_test(channel_size, num_layers, kernel_size):
+    in_size = out_size = prod(kernel_size)
+    sizes = (in_size,) + (channel_size,) * (num_layers - 1) + (out_size,)
+    layers = []
+    for i, (insz, outsz) in enumerate(zip(sizes, sizes[1:])):
+        layers += [nn.Linear(insz, outsz)]
+        if i != num_layers - 1:
+            layers += [nn.ReLU(inplace=True)]        
+            layers += [nn.Dropout(0.4)]
+        else:
+            layers += [nn.Sigmoid()]
+    
+    return nn.Sequential(*layers)
+
+wf = 2 * np.pi * 3 * 42.576 * (10 ** 6)
+mu = 4 * np.pi * (10 ** (-7))
+muwf = mu * wf
+res = 0.002, 0.002
+kernel_size = 17, 17
+
+channel_size = 2048
+num_layers = 4
+learning_rate = 1e-4
+
+net1 = build_net_test(channel_size, num_layers, kernel_size).to(device)
+net2 = build_net_test(channel_size, num_layers, kernel_size).to(device)
+net3 = build_net_test(channel_size, num_layers, kernel_size).to(device)
+
+net1 = net1.eval()
+net2 = net2.eval()
+net3 = net3.eval()
+
+net_path1 = "DL_Fit_Axial_Plane_Coupling.pt"
+net1.load_state_dict(torch.load(net_path1))
+
+net_path2 = "DL_Fit_Coronal_Plane_Coupling.pt"
+net2.load_state_dict(torch.load(net_path2))
+
+net_path3 = "DL_Fit_Sagittal_Plane_Coupling.pt"
+net3.load_state_dict(torch.load(net_path3))
 
 # Constants
 wf = 2 * np.pi * 3 * 42.576 * (10 ** 6)
@@ -36,22 +74,40 @@ muwf = mu * wf
 res = 0.002, 0.002
 kernel_size = 17, 17
 
-# Reshape data
-new_shape = (gts2.size(0) * gts2.size(1), gts2.size(2), gts2.size(3))
-gts = gts.reshape(new_shape)
-masks = masks.reshape(new_shape)
-imgs = imgs.reshape(new_shape)
+# Load Test Dataset
+data_test = loadmat("test_dataset.mat", simplify_cells=True)
+imgs_test, masks_test = [
+    data_test[k] for k in ["dataset_training", "dataset_mask"]
+]
+imgs_test, masks_test = (
+    torch.tensor(imgs_test, dtype=torch.complex64),
+    torch.tensor(masks_test, dtype=bool),
+)
+imgs_test, masks_test = [x.to(device) for x in [imgs_test, masks_test]]
 
-# Data Augmentation
-def augment_data(tensor):
-    flipped_slices_lr = torch.flip(tensor, dims=[2])
-    flipped_slices_ud = torch.flip(tensor, dims=[1])
-    flipped_slices_lr_ud = torch.flip(tensor, dims=[2])
-    return torch.cat([tensor, flipped_slices_lr, flipped_slices_ud, flipped_slices_lr_ud], dim=0)
+phase_test = torch.angle(imgs_test)
+mag_test = torch.abs(imgs_test)
 
-imgs = augment_data(imgs)
-masks = augment_data(masks)
-gts = augment_data(gts)
+# Test for Axial Plane
+DL_result_Axial = []
+for idx in range(imgs3.size(0)):
+    imgs_idx = imgs_test[idx]
+    mask_idx = mag_test[idx]
+    phase_idx = torch.angle(imgs_idx)
+    mag_idx = torch.abs(imgs_idx)
+    
+    lap_fn = laplacian_fn(mask_idx, kernel_size, res)
+    mean_idx, std_idx = torch.mean(mag_idx), torch.std(mag_idx)
+    
+    with torch.no_grad():
+        cond_nn = lap_fn(phase_idx /2, neural_weight_fn(mag_idx, mask_idx, net1, mean_idx, std_idx)) / muwf
+        DL_result = torch.where(cond_nn > 0, cond_nn2, lap_fn(phase_idx / 2, mag_weight_fn(mag_idx, mask_idx, sigma=0.2)) / muwf)
+        DL_result_Axial.append(DL_result)
+DL_result_Axial = torch.stack(DL_result_Axial) 
+
+
+
+
 
 # Prepare dataset
 phases, mags = torch.angle(imgs), torch.abs(imgs)
