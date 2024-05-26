@@ -11,7 +11,9 @@ import matplotlib.pyplot as plt
 import torch
 from skimage.metrics import normalized_root_mse as nrmse, structural_similarity as ssim, peak_signal_noise_ratio as psnr
 from util import configure
-from 2_Util_Phase_Only_Joint import laplacian_fn, mag_weight_fn, neural_weight_fn, build_net, train_net, Uncertainty_mask
+from 1_Util_Phase_Only import laplacian_fn, mag_weight_fn, neural_weight_fn, build_net, train_net, Uncertainty_mask
+from torch.optim.lr_scheduler import StepLR
+from tqdm import tqdm
 
 # Configure GPU
 configure(gpu_id=0)
@@ -36,28 +38,6 @@ muwf = mu * wf
 res = 0.002, 0.002
 kernel_size = 17, 17
 
-# Coronal Plane
-gts = gts.permute(0,2,1,3)
-masks = masks.permute(0,2,1,3)
-imgs= imgs.permute(0,2,1,3)
-
-# Reshape data
-new_shape = (gts.size(0) * gts.size(1), gts.size(2), gts.size(3))
-gts = gts.reshape(new_shape)
-masks = masks.reshape(new_shape)
-imgs = imgs.reshape(new_shape)
-
-# Data Augmentation
-def augment_data(tensor):
-    flipped_slices_lr = torch.flip(tensor, dims=[2])
-    flipped_slices_ud = torch.flip(tensor, dims=[1])
-    flipped_slices_lr_ud = torch.flip(tensor, dims=[2])
-    return torch.cat([tensor, flipped_slices_lr, flipped_slices_ud, flipped_slices_lr_ud], dim=0)
-
-imgs = augment_data(imgs)
-masks = augment_data(masks)
-gts = augment_data(gts)
-
 # Prepare dataset
 phases, mags = torch.angle(imgs), torch.abs(imgs)
 mean, std = torch.mean(mags), torch.std(mags)
@@ -74,15 +54,50 @@ class IterHook:
 # Training parameters
 channel_size = 2048
 num_layers = 4
-num_iters = 48000
-learning_rate = 1e-4
+#num_iters = 2000*6
+
+num_iters = 100
+learning_rate = 0.5*1e-4
 iter_hook = IterHook()
 
 # Build and train network
-net = build_net(channel_size, num_layers, kernel_size).to(device)
-net = train_net(net, dataset, num_iters, learning_rate, kernel_size, res, muwf, iter_hook)
+net1 = build_net(channel_size, num_layers, kernel_size).to(device)
+net2 = build_net(channel_size, num_layers, kernel_size).to(device)
+net3 = build_net(channel_size, num_layers, kernel_size).to(device)
+
+net_path1 = "DL_Fit_Axial_Plane.pt"
+net1.load_state_dict(torch.load(net_path1))
+
+net_path2 = "DL_Fit_Coronal_Plane.pt"
+net2.load_state_dict(torch.load(net_path2))
+
+net_path3 = "DL_Fit_Sagittal_Plane.pt"
+net3.load_state_dict(torch.load(net_path3))
+
+net1, net2, net3 = train_net(
+    net1, 
+    net2, 
+    net3,
+    dataset, 
+    num_iters, 
+    learning_rate,
+    learning_rate, 
+    learning_rate, 
+    
+    kernel_size, 
+    res, 
+    muwf, 
+    iter_hook, 
+    show_progress=True,
+    #device=device
+)
+losses = pd.DataFrame(iter_hook.losses) 
 
 # Save losses and model
-losses = pd.DataFrame(iter_hook.losses)
-net_path = "DL_Fit_Coronal_plane.pt"
-torch.save(net.state_dict(), net_path)
+net1_path = "DL_Fit_Axial_Plane_Coupling.pt"
+net2_path = "DL_Fit_Coronal_Plane_Coupling.pt"
+net3_path = "DL_Fit_Sagittal_Plane_Coupling.pt"
+
+torch.save(net1.state_dict(), net1_path)
+torch.save(net2.state_dict(), net2_path)
+torch.save(net3.state_dict(), net3_path)
