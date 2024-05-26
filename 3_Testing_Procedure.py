@@ -14,7 +14,7 @@ from skimage.metrics import normalized_root_mse as nrmse, structural_similarity 
 from util import configure
 import math
 from torch import nn
-from 2_Util_Phase_Only_Joint import laplacian_fn, mag_weight_fn, neural_weight_fn, build_net, train_net
+from Util_Phase_Only_Joint import laplacian_fn, mag_weight_fn, neural_weight_fn, build_net, train_net
 
 # Configure GPU
 configure(gpu_id=0)
