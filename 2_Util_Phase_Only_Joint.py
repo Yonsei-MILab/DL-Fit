@@ -129,7 +129,6 @@ def add_noise_to_complex(x, y):
     z = (add_noise(torch.real(x).cuda()) + 1j * add_noise(torch.imag(x).cuda())) * y
     return z
 
-
 def train_net(
     net1, 
     net2, 
@@ -196,10 +195,10 @@ def train_net(
             all_cond_net2.append(cond_net2.unsqueeze(0))  # 3D 텐서로 쌓기 위해 차원 추가
 
         # Coronal
-        masks_xz = mask.permute(0, 1, 2)
-        mags_xz = mags.permute(0, 1, 2)
-        phases_xz = phases.permute(0, 1, 2)
-        gt_xz = gt.permute(0, 1, 2)
+        masks_xz = mask.permute(1, 0, 2)
+        mags_xz = mags.permute(1, 0, 2)
+        phases_xz = phases.permute(1, 0, 2)
+        gt_xz = gt.permute(1, 0, 2)
 
         for j in range(masks_xz.shape[0]):
             cur_phases_xz, cur_mags_xz = phases_xz[j].squeeze(0), mags_xz[j].squeeze(0)
@@ -211,43 +210,32 @@ def train_net(
             cond_net3 = lap_fn_net3(cur_phases_xz / 2, weight_fn_net3) / muwf
             if torch.isnan(cond_net3).any() or torch.isinf(cond_net3).any():
                 continue
-            all_cond_net3.append(cond_net3.unsqueeze(0))  # 3D 텐서로 쌓기 위해 차원 추가
+            all_cond_net3.append(cond_net3.unsqueeze(0))
 
 
         if all_cond_net1 and all_cond_net2 and all_cond_net3:
             all_cond_net1 = torch.cat(all_cond_net1, dim=0) 
             all_cond_net2 = torch.cat(all_cond_net2, dim=0)
             all_cond_net3 = torch.cat(all_cond_net3, dim=0) 
-
-            # 손실 계산
-            loss_net1 = criterion(all_cond_net1, gt)  # 여기서 `gt`는 net1의 ground truth 여야 합니다.
-            loss_net1_ssim = 0.5*(1 - ssim(all_cond_net1.unsqueeze(0), gt.unsqueeze(0)))
-            loss_net2 = criterion(all_cond_net2, gt_zx)  # 여기서 `gt`는 net2의 ground truth 여야 합니다.
-            loss_net2_ssim = 0.5*(1 - ssim(all_cond_net2.unsqueeze(0), gt_zx.unsqueeze(0)))
-            loss_net3 = criterion(all_cond_net3, gt_zy)   
-            loss_net3_ssim = 0.5*(1 - ssim(all_cond_net3.unsqueeze(0), gt_zy.unsqueeze(0)))
-              
             all_cond_net2 = all_cond_net2.permute(1, 2, 0)
-            all_cond_net3 = all_cond_net3.permute(2, 0, 1)
-            
+            all_cond_net3 = all_cond_net3.permute(1, 0, 2)          
             tri_cond =  (all_cond_net1+all_cond_net2 +all_cond_net3)/3
+            
             loss_tri = criterion(tri_cond, gt)
             loss_tri_ssim = 0.5*(1 - ssim(tri_cond.unsqueeze(0), gt.unsqueeze(0)))
 
-            total_loss = 3*(loss_tri+loss_tri_ssim) #+ (loss_net1+loss_net1_ssim + loss_net2 +loss_net2_ssim+ loss_net3 + loss_net3_ssim)  # 두 네트워크의 평균 손실
-            total_loss.backward()  # 역전파
-            optimizer1.step()  # 네트워크1 업데이트
-            optimizer2.step()  # 네트워크2 업데이트
+            total_loss = loss_tri+loss_tri_ssim
+            total_loss.backward()
+            optimizer1.step()
+            optimizer2.step()
             optimizer3.step()
 
             pbar.set_description(f"loss={total_loss.item():.4f}")
             iter_hook(i, total_loss.item())
 
 
-    # 학습이 끝난 네트워크 반환
     return net1, net2  , net3     
    
-
 def neural_weight_fn(mag, mask, net, mean, std):
     sigma = 0.2
     mag = mag[mask]
@@ -268,4 +256,3 @@ def laplacian_fn(mask, kernel_size, res):
         lap = torch.zeros_like(phase).masked_scatter_(mask.contiguous(), lap)
         return lap
     return fn
-
