@@ -196,28 +196,27 @@ def train_net(
             all_cond_net2.append(cond_net2.unsqueeze(0))  # 3D 텐서로 쌓기 위해 차원 추가
 
         # Coronal
-        masks_zy = mask.permute(1, 2, 0)
-        mags_zy = mags.permute(1, 2, 0)
-        phases_zy = phases.permute(1, 2, 0)
-        gt_zy = gt.permute(1, 2, 0)
+        masks_xz = mask.permute(0, 1, 2)
+        mags_xz = mags.permute(0, 1, 2)
+        phases_xz = phases.permute(0, 1, 2)
+        gt_xz = gt.permute(0, 1, 2)
 
-        for j in range(masks_zy.shape[0]):
-            cur_phases_zy, cur_mags_zy = phases_zy[j].squeeze(0), mags_zy[j].squeeze(0)
-            cur_mask_zy = masks_zy[j].squeeze(0)
-            #cur_gt_zx = gt_zx[j].squeeze(0)
+        for j in range(masks_xz.shape[0]):
+            cur_phases_xz, cur_mags_xz = phases_xz[j].squeeze(0), mags_xz[j].squeeze(0)
+            cur_mask_xz = masks_xz[j].squeeze(0)
+            #cur_gt_xz = gt_xz[j].squeeze(0)
 
-            weight_fn_net3 = neural_weight_fn(cur_mags_zy, cur_mask_zy, net3, mean, std)
-            lap_fn_net3 = laplacian_fn(cur_mask_zy, kernel_size, res)
-            cond_net3 = lap_fn_net3(cur_phases_zy / 2, weight_fn_net3) / muwf
-            # NaN 또는 inf 검사를 계속 수행합니다.
+            weight_fn_net3 = neural_weight_fn(cur_mags_xz, cur_mask_xz, net3, mean, std)
+            lap_fn_net3 = laplacian_fn(cur_mask_xz, kernel_size, res)
+            cond_net3 = lap_fn_net3(cur_phases_xz / 2, weight_fn_net3) / muwf
             if torch.isnan(cond_net3).any() or torch.isinf(cond_net3).any():
                 continue
             all_cond_net3.append(cond_net3.unsqueeze(0))  # 3D 텐서로 쌓기 위해 차원 추가
 
-        # 결과 쌓기
-        if all_cond_net1 and all_cond_net2 and all_cond_net3:  # 리스트가 비어있지 않은 경우에만 진행
-            all_cond_net1 = torch.cat(all_cond_net1, dim=0)  # 3D 텐서 생성
-            all_cond_net2 = torch.cat(all_cond_net2, dim=0)  # 3D 텐서 생성
+
+        if all_cond_net1 and all_cond_net2 and all_cond_net3:
+            all_cond_net1 = torch.cat(all_cond_net1, dim=0) 
+            all_cond_net2 = torch.cat(all_cond_net2, dim=0)
             all_cond_net3 = torch.cat(all_cond_net3, dim=0) 
 
             # 손실 계산
