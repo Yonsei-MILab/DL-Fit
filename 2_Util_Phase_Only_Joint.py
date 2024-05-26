@@ -6,6 +6,7 @@ from tqdm import tqdm
 import numpy as np
 from math import exp
 from copy import deepcopy
+from torch.utils.data import DataLoader
 
 def gaussian(window_size, sigma):
     gauss = torch.Tensor([exp(-(x - window_size//2)**2/float(2*sigma**2)) for x in range(window_size)])
@@ -128,38 +129,125 @@ def add_noise_to_complex(x, y):
     z = (add_noise(torch.real(x).cuda()) + 1j * add_noise(torch.imag(x).cuda())) * y
     return z
 
+
 def train_net(
-    net,
+    net1, 
+    net2, 
+    net3,
     dataset,
     num_iters,
-    learning_rate,
+    learning_rate1, 
+    learning_rate2,
+    learning_rate3,
     kernel_size,
     res,
     muwf,
     iter_hook=lambda i, loss: None,
     show_progress=True,
+    device=None,
 ):
     dataset = islice(dataset, num_iters)
-    optimizer = torch.optim.Adam(params=net.parameters(), lr=learning_rate)
-    
+    optimizer1 = torch.optim.Adam(params=net1.parameters(), lr=learning_rate1)
+    optimizer2 = torch.optim.Adam(params=net2.parameters(), lr=learning_rate2)
+    optimizer3 = torch.optim.Adam(params=net3.parameters(), lr=learning_rate3)
+    criterion = nn.MSELoss()
+
     pbar = tqdm(enumerate(dataset, 1), total=num_iters, disable=not show_progress)
-    for i, (imgs, mask, gt) in pbar:    
-        optimizer.zero_grad()
-        lap_fn = laplacian_fn(mask, kernel_size, res)
+    for i, (imgs, mask, gt) in pbar:
+        optimizer1.zero_grad()
+        optimizer2.zero_grad()
+        optimizer3.zero_grad()
+
         imgs_noise = add_noise_to_complex(imgs, mask)
         phases, mags = torch.angle(imgs_noise), torch.abs(imgs_noise)
         mean, std = torch.mean(mags), torch.std(mags)
-        cond = (lap_fn(phases / 2, neural_weight_fn(mags, mask, net, mean, std)) / muwf)
-        loss = (nn.functional.mse_loss(cond[mask], gt[mask])  + 0.5 * (1 - ssim(torch.unsqueeze(torch.unsqueeze(cond, 0), 0), torch.unsqueeze(torch.unsqueeze(gt, 0), 0))))
 
-        if torch.isnan(loss) or torch.isinf(loss):
-            continue
-        loss.backward()
-        optimizer.step()       
-        loss = loss.item()
-        pbar.set_description(f"loss={loss:.4f}")
-        iter_hook(i, loss)
-    return net
+        all_cond_net1 = []
+        all_cond_net2 = []
+        all_cond_net3 = []
+
+        # Axial Plane
+        for j in range(imgs_noise.shape[0]):
+            cur_phases, cur_mags = phases[j].squeeze(0), mags[j].squeeze(0)
+            cur_mask = mask[j].squeeze(0)
+            weight_fn_net1 = neural_weight_fn(cur_mags, cur_mask, net1, mean, std)
+            lap_fn_net1 = laplacian_fn(cur_mask, kernel_size, res)
+            cond_net1 = lap_fn_net1(cur_phases / 2, weight_fn_net1) / muwf
+            if torch.isnan(cond_net1).any() or torch.isinf(cond_net1).any():
+                continue
+            all_cond_net1.append(cond_net1.unsqueeze(0))
+
+        # Sagittal
+        masks_zy = mask.permute(2, 0, 1)
+        mags_zy = mags.permute(2, 0, 1)
+        phases_zy = phases.permute(2, 0, 1)
+        gt_zy = gt.permute(2, 0, 1)
+
+        for j in range(masks_zx.shape[0]):
+            cur_phases_zy, cur_mags_zy = phases_zy[j].squeeze(0), mags_zy[j].squeeze(0)
+            cur_mask_zy = masks_zy[j].squeeze(0)
+            #cur_gt_zy = gt_zy[j].squeeze(0)
+
+            weight_fn_net2 = neural_weight_fn(cur_mags_zy, cur_mask_zy, net2, mean, std)
+            lap_fn_net2 = laplacian_fn(cur_mask_zy, kernel_size, res)
+            cond_net2 = lap_fn_net2(cur_phases_zy / 2, weight_fn_net2) / muwf
+            if torch.isnan(cond_net2).any() or torch.isinf(cond_net2).any():
+                continue
+            all_cond_net2.append(cond_net2.unsqueeze(0))  # 3D 텐서로 쌓기 위해 차원 추가
+
+        # Coronal
+        masks_zy = mask.permute(1, 2, 0)
+        mags_zy = mags.permute(1, 2, 0)
+        phases_zy = phases.permute(1, 2, 0)
+        gt_zy = gt.permute(1, 2, 0)
+
+        for j in range(masks_zy.shape[0]):
+            cur_phases_zy, cur_mags_zy = phases_zy[j].squeeze(0), mags_zy[j].squeeze(0)
+            cur_mask_zy = masks_zy[j].squeeze(0)
+            #cur_gt_zx = gt_zx[j].squeeze(0)
+
+            weight_fn_net3 = neural_weight_fn(cur_mags_zy, cur_mask_zy, net3, mean, std)
+            lap_fn_net3 = laplacian_fn(cur_mask_zy, kernel_size, res)
+            cond_net3 = lap_fn_net3(cur_phases_zy / 2, weight_fn_net3) / muwf
+            # NaN 또는 inf 검사를 계속 수행합니다.
+            if torch.isnan(cond_net3).any() or torch.isinf(cond_net3).any():
+                continue
+            all_cond_net3.append(cond_net3.unsqueeze(0))  # 3D 텐서로 쌓기 위해 차원 추가
+
+        # 결과 쌓기
+        if all_cond_net1 and all_cond_net2 and all_cond_net3:  # 리스트가 비어있지 않은 경우에만 진행
+            all_cond_net1 = torch.cat(all_cond_net1, dim=0)  # 3D 텐서 생성
+            all_cond_net2 = torch.cat(all_cond_net2, dim=0)  # 3D 텐서 생성
+            all_cond_net3 = torch.cat(all_cond_net3, dim=0) 
+
+            # 손실 계산
+            loss_net1 = criterion(all_cond_net1, gt)  # 여기서 `gt`는 net1의 ground truth 여야 합니다.
+            loss_net1_ssim = 0.5*(1 - ssim(all_cond_net1.unsqueeze(0), gt.unsqueeze(0)))
+            loss_net2 = criterion(all_cond_net2, gt_zx)  # 여기서 `gt`는 net2의 ground truth 여야 합니다.
+            loss_net2_ssim = 0.5*(1 - ssim(all_cond_net2.unsqueeze(0), gt_zx.unsqueeze(0)))
+            loss_net3 = criterion(all_cond_net3, gt_zy)   
+            loss_net3_ssim = 0.5*(1 - ssim(all_cond_net3.unsqueeze(0), gt_zy.unsqueeze(0)))
+              
+            all_cond_net2 = all_cond_net2.permute(1, 2, 0)
+            all_cond_net3 = all_cond_net3.permute(2, 0, 1)
+            
+            tri_cond =  (all_cond_net1+all_cond_net2 +all_cond_net3)/3
+            loss_tri = criterion(tri_cond, gt)
+            loss_tri_ssim = 0.5*(1 - ssim(tri_cond.unsqueeze(0), gt.unsqueeze(0)))
+
+            total_loss = 3*(loss_tri+loss_tri_ssim) #+ (loss_net1+loss_net1_ssim + loss_net2 +loss_net2_ssim+ loss_net3 + loss_net3_ssim)  # 두 네트워크의 평균 손실
+            total_loss.backward()  # 역전파
+            optimizer1.step()  # 네트워크1 업데이트
+            optimizer2.step()  # 네트워크2 업데이트
+            optimizer3.step()
+
+            pbar.set_description(f"loss={total_loss.item():.4f}")
+            iter_hook(i, total_loss.item())
+
+
+    # 학습이 끝난 네트워크 반환
+    return net1, net2  , net3     
+   
 
 def neural_weight_fn(mag, mask, net, mean, std):
     sigma = 0.2
