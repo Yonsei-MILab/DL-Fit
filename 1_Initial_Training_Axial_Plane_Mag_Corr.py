@@ -1,7 +1,3 @@
-# Import necessary libraries
-%load_ext autoreload
-%autoreload 2
-
 import copy
 from itertools import cycle
 import numpy as np
@@ -19,15 +15,16 @@ device = torch.device("cuda")
 
 # Load training dataset
 data = loadmat("training_dataset.mat", simplify_cells=True)
-gts, masks, imgs = [data[k] for k in ["dataset_label", "dataset_mask", "dataset_training"]]
+gts, masks, imgs, b1_corr = [data[k] for k in ["dataset_label", "dataset_mask", "dataset_training", "dataset_b1_corr"]]
 
 # Convert to torch tensors and move to device
-gts, masks, imgs = (
+gts, masks, imgs, b1_corr = (
     torch.tensor(gts, dtype=torch.float),
     torch.tensor(masks, dtype=bool),
     torch.tensor(imgs, dtype=torch.complex64),
+    torch.tensor(b1_corr, dtype=torch.float),
 )
-gts, masks, imgs = [x.to(device) for x in [gts, masks, imgs]]
+gts, masks, imgs, b1_corr = [x.to(device) for x in [gts, masks, imgs, b1_corr]]
 
 # Constants
 wf = 2 * np.pi * 3 * 42.576 * (10 ** 6)
@@ -41,6 +38,7 @@ new_shape = (gts.size(0) * gts.size(1), gts.size(2), gts.size(3))
 gts = gts.reshape(new_shape)
 masks = masks.reshape(new_shape)
 imgs = imgs.reshape(new_shape)
+b1_corr = b1_corr.reshape(new_shape)
 
 # Data Augmentation
 def augment_data(tensor):
@@ -52,11 +50,12 @@ def augment_data(tensor):
 imgs = augment_data(imgs)
 masks = augment_data(masks)
 gts = augment_data(gts)
+b1_corr = augment_data(b1_corr)
 
 # Prepare dataset
 phases, mags = torch.angle(imgs), torch.abs(imgs)
 mean, std = torch.mean(mags), torch.std(mags)
-dataset = cycle(zip(imgs, masks, gts))
+dataset = cycle(zip(imgs, masks, gts, b1_corr))
 
 # Iteration hook to track losses
 class IterHook:
