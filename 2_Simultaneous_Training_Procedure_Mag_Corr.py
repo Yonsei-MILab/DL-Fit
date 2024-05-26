@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import torch
 from skimage.metrics import normalized_root_mse as nrmse, structural_similarity as ssim, peak_signal_noise_ratio as psnr
 from Util import configure
-from Util_Phase_Only_Joint import laplacian_fn, mag_weight_fn, neural_weight_fn, build_net, train_net
+from Util_Mag_Corr import laplacian_fn, mag_weight_fn, neural_weight_fn, build_net, train_net
 from torch.optim.lr_scheduler import StepLR
 from tqdm import tqdm
 
