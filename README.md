@@ -9,14 +9,14 @@ The paper entitled: "A Joint 2.5D Physics-coupled Deep learning based Polynomial
 ## Usage
 * Util.py: Code for common utility function.
 
-### Phase-only polynomial fitting conductivity reconstruction 
+### DL-based phase-only polynomial fitting conductivity reconstruction 
 * Util_Phase_Only.py: Utility code for phase-only polynomial fitting (for 2D).
 * Util_Phase_Only_Joint.py: Utility code for phase-only polynomial fitting (for simultaneous training).
 * 1_Initial_Training_Axial_Plane_Phase_Only.py, 1_Initial_Training_Coronal_Plane_Phase_Only.py, 1_Initial_Training_Sagittal_Plane_Phase_Only.py: Training code for each orthogonal plane.
 * 2_Simultaneous_Training_Procedure_Phase_Only.py: Simultaneous training code for the physics-coupling procedure.
 * 3_Testing_Procedure_Phase_Only.py: Testing code.
 
-### Polynomial fitting conductivity reconstruction with B1+ magnitude correction 
+### DL-based polynomial fitting conductivity reconstruction with B1+ magnitude correction 
 * Util_Mag_Corr.py: Utility code for polynomial fitting with B1+ magnitude correction (for 2D).
 * Util_Mag_Corr_Joint.py: Utility code for polynomial fitting with B1+ magnitude correction (for simultaneous training).
 * 1_Initial_Training_Axial_Plane_Mag_Corr.py, 1_Initial_Training_Coronal_Plane_Mag_Corr.py, 1_Initial_Training_Sagittal_Plane_Mag_Corr.py: Training code for each orthogonal plane.
