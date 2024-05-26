@@ -192,7 +192,7 @@ def train_net(
             cond_net2 = lap_fn_net2(cur_phases_zy / 2, weight_fn_net2) / muwf
             if torch.isnan(cond_net2).any() or torch.isinf(cond_net2).any():
                 continue
-            all_cond_net2.append(cond_net2.unsqueeze(0))  # 3D 텐서로 쌓기 위해 차원 추가
+            all_cond_net2.append(cond_net2.unsqueeze(0))
 
         # Coronal
         masks_xz = mask.permute(1, 0, 2)
