@@ -10,8 +10,8 @@ from scipy.io import loadmat
 import matplotlib.pyplot as plt
 import torch
 from skimage.metrics import normalized_root_mse as nrmse, structural_similarity as ssim, peak_signal_noise_ratio as psnr
-from util import configure
-from 1_Util_Phase_Only import laplacian_fn, mag_weight_fn, neural_weight_fn, build_net, train_net
+from Util import configure
+from Util_Phase_Only import laplacian_fn, mag_weight_fn, neural_weight_fn, build_net, train_net
 
 # Configure GPU
 configure(gpu_id=0)
