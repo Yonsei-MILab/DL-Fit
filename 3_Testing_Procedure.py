@@ -2,6 +2,7 @@
 %load_ext autoreload
 %autoreload 2
 
+import scipy.io
 import copy
 from itertools import cycle
 import numpy as np
@@ -159,33 +160,20 @@ DL_result_sagittal = DL_result_sagittal.permute(1,2,0)
 
 DL_result_coupled = (DL_result_axial + DL_result_coronal + DL_result_sagittal) / 3
 
-# 1, 2, 0 => 2, 0, 1
-# 2, 0, 1 -> 1, 2, 0
-# Prepare dataset
-phases, mags = torch.angle(imgs), torch.abs(imgs)
-mean, std = torch.mean(mags), torch.std(mags)
-dataset = cycle(zip(imgs, masks, gts))
+# Save
+DL_result_axial_np = DL_result_axial.cpu().numpy()
+DL_result_coronal_np = DL_result_coronal.cpu().numpy()
+DL_result_sagittal_np = DL_result_sagittal.cpu().numpy()
+DL_result_coupled_np = DL_result_coupled.cpu().numpy()
+imgs_test_np = imgs_test.cpu().numpy()
+masks_test_np =  masks_test.cpu().numpy()
 
-# Iteration hook to track losses
-class IterHook:
-    def __init__(self):
-        self.losses = []
-
-    def __call__(self, i, loss):
-        self.losses.append({"Iteration": i, "Loss": loss})
-
-# Training parameters
-channel_size = 2048
-num_layers = 4
-num_iters = 48000
-learning_rate = 1e-4
-iter_hook = IterHook()
-
-# Build and train network
-net = build_net(channel_size, num_layers, kernel_size).to(device)
-net = train_net(net, dataset, num_iters, learning_rate, kernel_size, res, muwf, iter_hook)
-
-# Save losses and model
-losses = pd.DataFrame(iter_hook.losses)
-net_path = "DL_Fit_xy_plane.pt"
-torch.save(net.state_dict(), net_path)
+mat_dict = {
+    'DL_axial': DL_result_axial_np, 
+    'DL_coronal': DL_result_coronal_np, 
+    'DL_sagittal': DL_result_sagittal_np,
+    'DL_coupled': DL_result_coupled_np,
+    'imgs': imgs_test_np, 
+    'mask': masks_test_np
+}
+scipy.io.savemat('Result.mat', mat_dict)
