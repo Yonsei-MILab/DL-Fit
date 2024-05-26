@@ -36,10 +36,10 @@ muwf = mu * wf
 res = 0.002, 0.002
 kernel_size = 17, 17
 
-# Coronal Plane
-gts = gts.permute(0,2,1,3)
-masks = masks.permute(0,2,1,3)
-imgs= imgs.permute(0,2,1,3)
+# Sagittal Plane
+gts = gts.permute(0,3,1,2)
+masks = masks.permute(0,3,1,2)
+imgs= imgs.permute(0,3,1,2)
 
 # Reshape data
 new_shape = (gts.size(0) * gts.size(1), gts.size(2), gts.size(3))
