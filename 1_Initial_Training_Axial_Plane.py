@@ -37,7 +37,7 @@ res = 0.002, 0.002
 kernel_size = 17, 17
 
 # Reshape data
-new_shape = (gts2.size(0) * gts2.size(1), gts2.size(2), gts2.size(3))
+new_shape = (gts.size(0) * gts.size(1), gts.size(2), gts.size(3))
 gts = gts.reshape(new_shape)
 masks = masks.reshape(new_shape)
 imgs = imgs.reshape(new_shape)
