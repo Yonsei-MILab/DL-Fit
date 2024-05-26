@@ -17,15 +17,16 @@ device = torch.device("cuda")
 
 # Load training dataset
 data = loadmat("training_dataset.mat", simplify_cells=True)
-gts, masks, imgs = [data[k] for k in ["dataset_label", "dataset_mask", "dataset_training"]]
+gts, masks, imgs, b1_corr = [data[k] for k in ["dataset_label", "dataset_mask", "dataset_training", "dataset_b1_corr"]]
 
 # Convert to torch tensors and move to device
-gts, masks, imgs = (
+gts, masks, imgs, b1_corr = (
     torch.tensor(gts, dtype=torch.float),
     torch.tensor(masks, dtype=bool),
     torch.tensor(imgs, dtype=torch.complex64),
+    torch.tensor(b1_corr, dtype=torch.float),
 )
-gts, masks, imgs = [x.to(device) for x in [gts, masks, imgs]]
+gts, masks, imgs, b1_corr = [x.to(device) for x in [gts, masks, imgs, b1_corr]]
 
 # Constants
 wf = 2 * np.pi * 3 * 42.576 * (10 ** 6)
@@ -37,7 +38,7 @@ kernel_size = 17, 17
 # Prepare dataset
 phases, mags = torch.angle(imgs), torch.abs(imgs)
 mean, std = torch.mean(mags), torch.std(mags)
-dataset = cycle(zip(imgs, masks, gts))
+dataset = cycle(zip(imgs, masks, gts, b1_corr))
 
 # Iteration hook to track losses
 class IterHook:
@@ -85,7 +86,6 @@ net1, net2, net3 = train_net(
     muwf, 
     iter_hook, 
     show_progress=True,
-    #device=device
 )
 losses = pd.DataFrame(iter_hook.losses) 
 
