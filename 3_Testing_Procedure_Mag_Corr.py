@@ -1,7 +1,3 @@
-# Import necessary libraries
-%load_ext autoreload
-%autoreload 2
-
 import scipy.io
 import copy
 from itertools import cycle
@@ -77,14 +73,15 @@ kernel_size = 17, 17
 
 # Load Test Dataset
 data_test = loadmat("test_dataset.mat", simplify_cells=True)
-imgs_test, masks_test = [
-    data_test[k] for k in ["dataset_training", "dataset_mask"]
+imgs_test, masks_test, b1_corr_test = [
+    data_test[k] for k in ["dataset_training", "dataset_mask", "dataset_b1_corr"]
 ]
-imgs_test, masks_test = (
+imgs_test, masks_test, b1_corr_test = (
     torch.tensor(imgs_test, dtype=torch.complex64),
     torch.tensor(masks_test, dtype=bool),
+    torch.tensor(b1_corr, dtype=torch.float),
 )
-imgs_test, masks_test = [x.to(device) for x in [imgs_test, masks_test]]
+imgs_test, masks_test, b1_corr_test = [x.to(device) for x in [imgs_test, masks_test, b1_corr_test]]
 
 phase_test = torch.angle(imgs_test)
 mag_test = torch.abs(imgs_test)
@@ -105,7 +102,7 @@ for idx in range(imgs_test.size(0)):
         DL_result = torch.where(cond_nn > 0, cond_nn2, lap_fn(phase_idx / 2, mag_weight_fn(mag_idx, mask_idx, sigma=0.2)) / muwf)
         DL_result_axial.append(DL_result)
 DL_result_axial = torch.stack(DL_result_axial) 
-
+DL_result_axial = DL_result_axial + b1_corr_test
 
 # Test for Coronal Plane
 masks_test_coronal = masks_test.permute(1,0,2)
@@ -131,7 +128,7 @@ for idx in range(imgs_test_coronal.size(0)):
         DL_result_coronal.append(DL_result)
 DL_result_coronal = torch.stack(DL_result_coronal) 
 DL_result_coronal = DL_result_coronal.permute(1,0,2)
-
+DL_result_coronal = DL_result_coronal + b1_corr_test
 
 # Test for Sagittal Plane
 masks_test_sagittal = masks_test.permute(2,0,1)
@@ -157,6 +154,7 @@ for idx in range(imgs_test_sagittal.size(0)):
         DL_result_sagittal.append(DL_result)
 DL_result_sagittal = torch.stack(DL_result_sagittal) 
 DL_result_sagittal = DL_result_sagittal.permute(1,2,0)
+DL_result_sagittal = DL_result_sagittal + b1_corr_test
 
 DL_result_coupled = (DL_result_axial + DL_result_coronal + DL_result_sagittal) / 3
 
@@ -165,8 +163,10 @@ DL_result_axial_np = DL_result_axial.cpu().numpy()
 DL_result_coronal_np = DL_result_coronal.cpu().numpy()
 DL_result_sagittal_np = DL_result_sagittal.cpu().numpy()
 DL_result_coupled_np = DL_result_coupled.cpu().numpy()
+b1_corr_test_np = b1_corr_test.numpy()
 imgs_test_np = imgs_test.cpu().numpy()
 masks_test_np =  masks_test.cpu().numpy()
+b1_corr_test_np = b1_corr_test.numpy()
 
 mat_dict = {
     'DL_axial': DL_result_axial_np, 
@@ -174,6 +174,7 @@ mat_dict = {
     'DL_sagittal': DL_result_sagittal_np,
     'DL_coupled': DL_result_coupled_np,
     'imgs': imgs_test_np, 
-    'mask': masks_test_np
+    'mask': masks_test_np,
+    'b1_corr': b1_corr_test_np,
 }
 scipy.io.savemat('Result.mat', mat_dict)
