@@ -152,7 +152,7 @@ def train_net(
     criterion = nn.MSELoss()
 
     pbar = tqdm(enumerate(dataset, 1), total=num_iters, disable=not show_progress)
-    for i, (imgs, mask, gt) in pbar:
+    for i, (imgs, mask, gt, b1_corr) in pbar:
         optimizer1.zero_grad()
         optimizer2.zero_grad()
         optimizer3.zero_grad()
@@ -181,6 +181,7 @@ def train_net(
         mags_zy = mags.permute(2, 0, 1)
         phases_zy = phases.permute(2, 0, 1)
         gt_zy = gt.permute(2, 0, 1)
+        b1_corr_zy = b1_corr.permute(2, 0, 1)
 
         for j in range(masks_zx.shape[0]):
             cur_phases_zy, cur_mags_zy = phases_zy[j].squeeze(0), mags_zy[j].squeeze(0)
@@ -192,18 +193,18 @@ def train_net(
             cond_net2 = lap_fn_net2(cur_phases_zy / 2, weight_fn_net2) / muwf
             if torch.isnan(cond_net2).any() or torch.isinf(cond_net2).any():
                 continue
-            all_cond_net2.append(cond_net2.unsqueeze(0))  # 3D 텐서로 쌓기 위해 차원 추가
+            all_cond_net2.append(cond_net2.unsqueeze(0))
 
         # Coronal
         masks_xz = mask.permute(1, 0, 2)
         mags_xz = mags.permute(1, 0, 2)
         phases_xz = phases.permute(1, 0, 2)
         gt_xz = gt.permute(1, 0, 2)
+        b1_corr_xz = b1_corr.permute(1, 0, 2)
 
         for j in range(masks_xz.shape[0]):
             cur_phases_xz, cur_mags_xz = phases_xz[j].squeeze(0), mags_xz[j].squeeze(0)
             cur_mask_xz = masks_xz[j].squeeze(0)
-            #cur_gt_xz = gt_xz[j].squeeze(0)
 
             weight_fn_net3 = neural_weight_fn(cur_mags_xz, cur_mask_xz, net3, mean, std)
             lap_fn_net3 = laplacian_fn(cur_mask_xz, kernel_size, res)
@@ -214,9 +215,9 @@ def train_net(
 
 
         if all_cond_net1 and all_cond_net2 and all_cond_net3:
-            all_cond_net1 = torch.cat(all_cond_net1, dim=0) 
-            all_cond_net2 = torch.cat(all_cond_net2, dim=0)
-            all_cond_net3 = torch.cat(all_cond_net3, dim=0) 
+            all_cond_net1 = torch.cat(all_cond_net1, dim=0) + b1_corr
+            all_cond_net2 = torch.cat(all_cond_net2, dim=0) + b1_corr_zy
+            all_cond_net3 = torch.cat(all_cond_net3, dim=0) + b1_corr_xz
             all_cond_net2 = all_cond_net2.permute(1, 2, 0)
             all_cond_net3 = all_cond_net3.permute(1, 0, 2)          
             tri_cond =  (all_cond_net1+all_cond_net2 +all_cond_net3)/3
