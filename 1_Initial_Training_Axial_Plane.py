@@ -79,5 +79,5 @@ net = train_net(net, dataset, num_iters, learning_rate, kernel_size, res, muwf, 
 
 # Save losses and model
 losses = pd.DataFrame(iter_hook.losses)
-net_path = "DL_Fit_xy_plane.pt"
+net_path = "DL_Fit_Axial_Plane.pt"
 torch.save(net.state_dict(), net_path)
