@@ -143,13 +143,13 @@ def train_net(
     optimizer = torch.optim.Adam(params=net.parameters(), lr=learning_rate)
     
     pbar = tqdm(enumerate(dataset, 1), total=num_iters, disable=not show_progress)
-    for i, (imgs, mask, gt) in pbar:    
+    for i, (imgs, mask, gt, b1_corr) in pbar:    
         optimizer.zero_grad()
         lap_fn = laplacian_fn(mask, kernel_size, res)
         imgs_noise = add_noise_to_complex(imgs, mask)
         phases, mags = torch.angle(imgs_noise), torch.abs(imgs_noise)
         mean, std = torch.mean(mags), torch.std(mags)
-        cond = (lap_fn(phases / 2, neural_weight_fn(mags, mask, net, mean, std)) / muwf)
+        cond = (lap_fn(phases / 2, neural_weight_fn(mags, mask, net, mean, std)) / muwf) + b1_corr
         loss = (nn.functional.mse_loss(cond[mask], gt[mask])  + 0.5 * (1 - ssim(torch.unsqueeze(torch.unsqueeze(cond, 0), 0), torch.unsqueeze(torch.unsqueeze(gt, 0), 0))))
 
         if torch.isnan(loss) or torch.isinf(loss):
