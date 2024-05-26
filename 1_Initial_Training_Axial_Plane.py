@@ -37,9 +37,10 @@ res = 0.002, 0.002
 kernel_size = 17, 17
 
 # Reshape data
-gts = gts.reshape(-1, gts.size(-2), gts.size(-1))
-masks = masks.reshape(-1, masks.size(-2), masks.size(-1))
-imgs = imgs.reshape(-1, imgs.size(-2), imgs.size(-1))
+new_shape = (gts2.size(0) * gts2.size(1), gts2.size(2), gts2.size(3))
+gts = gts.reshape(new_shape)
+masks = masks.reshape(new_shape)
+imgs = imgs.reshape(new_shape)
 
 # Data Augmentation
 def augment_data(tensor):
