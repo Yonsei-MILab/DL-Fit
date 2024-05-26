@@ -1,7 +1,3 @@
-# Import necessary libraries
-%load_ext autoreload
-%autoreload 2
-
 import scipy.io
 import copy
 from itertools import cycle
