@@ -51,7 +51,6 @@ class IterHook:
 # Training parameters
 channel_size = 2048
 num_layers = 4
-#num_iters = 2000*6
 
 num_iters = 100
 learning_rate = 0.5*1e-4
