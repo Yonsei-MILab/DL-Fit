@@ -3,7 +3,7 @@ Source code for the DL-Fit.
 
 
 ## Submitted Paper
-The paper entitled: "A Joint 2.5D Physics-coupled Deep learning based Polynomial Fitting Approach for MR Electrical Properties Tomography" was submitted to IEEE Transactions on Medical Imaging (Kyu-Jin Jung & Thierry G. Meerbothe et al., 2024).
+The paper entitled: "A Joint 2.5D Physics-coupled Deep learning based Polynomial Fitting Approach for MR Electrical Properties Tomography" was submitted to IEEE Transactions on Medical Imaging (Kyu-Jin Jung & Thierry G. Meerbothe et al., 3rd June 2024).
 
 
 ## Usage
